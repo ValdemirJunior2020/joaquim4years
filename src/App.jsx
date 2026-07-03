@@ -4,6 +4,11 @@ const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
 const WHATSAPP_URL =
   'https://wa.me/19548606616?text=Hi%20Sarah%2C%20I%20have%20a%20question%20about%20Joaquim%27s%204th%20birthday%20party';
 
+const PARTY_ADDRESS = '1915 N A St, Lake Worth Beach, FL 33460';
+const PARTY_MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+  PARTY_ADDRESS,
+)}`;
+
 const EMPTY_FORM = {
   guestName: '',
   attendance: 'Yes',
@@ -31,7 +36,9 @@ function createLocalWish(form) {
     guestName: form.guestName.trim(),
     message:
       form.message.trim() ||
-      `${form.guestName.trim()} ${form.attendance === 'Yes' ? 'is excited to celebrate' : 'sent birthday love'}!`,
+      `${form.guestName.trim()} ${
+        form.attendance === 'Yes' ? 'is excited to celebrate' : 'sent birthday love'
+      }!`,
     reactionCounts: {},
     createdAt: new Date().toISOString(),
   };
@@ -70,6 +77,29 @@ async function sendToGoogleSheets(payload) {
   return data;
 }
 
+function TopNav() {
+  return (
+    <nav className="top-nav" aria-label="Birthday party details">
+      <div className="top-nav-main">
+        <span className="top-nav-pill">🎉 Joaquim&apos;s 4th Birthday</span>
+        <span>📅 July 30</span>
+        <span>🏠 Blue Room</span>
+        <span>⏰ Time TBC</span>
+      </div>
+
+      <a
+        className="directions-button"
+        href={PARTY_MAPS_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Get directions to Joaquim's birthday party"
+      >
+        📍 Directions
+      </a>
+    </nav>
+  );
+}
+
 function FloatingDecorations() {
   return (
     <div className="decorations" aria-hidden="true">
@@ -89,9 +119,33 @@ function FloatingDecorations() {
 
 function MusicControl() {
   const audioRef = useRef(null);
+  const userPausedRef = useRef(false);
+  const interactionStartedRef = useRef(false);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [isReady, setIsReady] = useState(false);
+
+  const playMusic = async () => {
+    const audio = audioRef.current;
+    if (!audio) return false;
+
+    try {
+      audio.volume = 0.28;
+      audio.loop = true;
+      await audio.play();
+
+      setIsPlaying(true);
+      setNeedsTap(false);
+      interactionStartedRef.current = true;
+
+      return true;
+    } catch {
+      setNeedsTap(true);
+      setIsPlaying(false);
+      return false;
+    }
+  };
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -100,19 +154,35 @@ function MusicControl() {
     audio.volume = 0.28;
     audio.loop = true;
 
-    const attemptPlay = async () => {
-      try {
-        await audio.play();
-        setIsPlaying(true);
-        setNeedsTap(false);
-      } catch {
-        setNeedsTap(true);
-      } finally {
-        setIsReady(true);
-      }
+    const attemptAutoplay = async () => {
+      await playMusic();
+      setIsReady(true);
     };
 
-    attemptPlay();
+    attemptAutoplay();
+  }, []);
+
+  useEffect(() => {
+    const startMusicFromAnyTouch = async () => {
+      if (userPausedRef.current || interactionStartedRef.current) return;
+
+      const audio = audioRef.current;
+      if (!audio || !audio.paused) return;
+
+      await playMusic();
+    };
+
+    window.addEventListener('pointerdown', startMusicFromAnyTouch, { passive: true });
+    window.addEventListener('touchstart', startMusicFromAnyTouch, { passive: true });
+    window.addEventListener('click', startMusicFromAnyTouch);
+    window.addEventListener('keydown', startMusicFromAnyTouch);
+
+    return () => {
+      window.removeEventListener('pointerdown', startMusicFromAnyTouch);
+      window.removeEventListener('touchstart', startMusicFromAnyTouch);
+      window.removeEventListener('click', startMusicFromAnyTouch);
+      window.removeEventListener('keydown', startMusicFromAnyTouch);
+    };
   }, []);
 
   const toggleMusic = async () => {
@@ -120,27 +190,26 @@ function MusicControl() {
     if (!audio) return;
 
     if (audio.paused) {
-      try {
-        await audio.play();
-        setIsPlaying(true);
-        setNeedsTap(false);
-      } catch {
-        setNeedsTap(true);
-      }
+      userPausedRef.current = false;
+      await playMusic();
     } else {
+      userPausedRef.current = true;
       audio.pause();
       setIsPlaying(false);
+      setNeedsTap(false);
     }
   };
 
   return (
     <div className="music-wrap" aria-live="polite">
       <audio ref={audioRef} src="/joaquimtheme.mp3" preload="auto" />
-      {needsTap && (
+
+      {needsTap && !userPausedRef.current && (
         <button className="music-prompt" onClick={toggleMusic} type="button">
-          Tap to play Joaquim&apos;s birthday music ✨
+          Tap anywhere to play Joaquim&apos;s birthday music ✨
         </button>
       )}
+
       <button
         className="music-button"
         onClick={toggleMusic}
@@ -150,6 +219,7 @@ function MusicControl() {
       >
         <span aria-hidden="true">{isPlaying ? '⏸️' : '🎵'}</span>
       </button>
+
       {!isReady && <span className="sr-only">Loading music control</span>}
     </div>
   );
@@ -164,7 +234,9 @@ function Hero() {
     <header className="hero">
       <div className="hero-card glass-card">
         <p className="eyebrow">You&apos;re invited</p>
+
         <h1>Joaquim is turning 4!</h1>
+
         <p className="hero-copy">
           Join us for a sweet pastel-blue celebration filled with smiles, music, birthday wishes,
           and a little magic for Joaquim&apos;s special day.
@@ -174,6 +246,7 @@ function Hero() {
           <button className="primary-button" type="button" onClick={scrollToRsvp}>
             Confirm Presence
           </button>
+
           <a className="secondary-button" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
             Contact Sarah on WhatsApp
           </a>
@@ -197,6 +270,7 @@ function RSVPForm({ onWishAdded }) {
 
   const updateField = (event) => {
     const { name, value } = event.target;
+
     setForm((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: '' }));
   };
@@ -205,13 +279,18 @@ function RSVPForm({ onWishAdded }) {
     const nextErrors = {};
     const count = Number(form.guestCount);
 
-    if (!form.guestName.trim()) nextErrors.guestName = 'Please enter your name.';
+    if (!form.guestName.trim()) {
+      nextErrors.guestName = 'Please enter your name.';
+    }
+
     if (!['Yes', 'No', 'Maybe'].includes(form.attendance)) {
       nextErrors.attendance = 'Please choose Yes, No, or Maybe.';
     }
+
     if (!Number.isInteger(count) || count < 1 || count > 25) {
       nextErrors.guestCount = 'Enter a guest count between 1 and 25.';
     }
+
     if (form.message.length > 220) {
       nextErrors.message = 'Please keep the birthday message under 220 characters.';
     }
@@ -222,6 +301,7 @@ function RSVPForm({ onWishAdded }) {
 
   const submitForm = async (event) => {
     event.preventDefault();
+
     if (isSubmitting || !validate()) return;
 
     setIsSubmitting(true);
@@ -243,10 +323,12 @@ function RSVPForm({ onWishAdded }) {
 
       onWishAdded(wish);
       setConfettiKey((key) => key + 1);
+
       setStatus({
         type: 'success',
         message: 'Thank you! Sarah received your RSVP for Joaquim’s birthday.',
       });
+
       setForm(EMPTY_FORM);
     } catch (error) {
       setStatus({
@@ -273,9 +355,11 @@ function RSVPForm({ onWishAdded }) {
 
       <div className="form-shell glass-card">
         {confettiKey > 0 && <Confetti key={confettiKey} />}
+
         <form onSubmit={submitForm} noValidate>
           <div className="field-group">
             <label htmlFor="guestName">Guest name *</label>
+
             <input
               id="guestName"
               name="guestName"
@@ -288,6 +372,7 @@ function RSVPForm({ onWishAdded }) {
               aria-describedby={errors.guestName ? 'guestName-error' : undefined}
               required
             />
+
             {errors.guestName && (
               <span className="field-error" id="guestName-error">
                 {errors.guestName}
@@ -297,6 +382,7 @@ function RSVPForm({ onWishAdded }) {
 
           <fieldset className="field-group attendance-group">
             <legend>Attending status *</legend>
+
             <div className="segmented-control">
               {['Yes', 'No', 'Maybe'].map((option) => (
                 <label key={option} className={form.attendance === option ? 'selected' : ''}>
@@ -311,12 +397,14 @@ function RSVPForm({ onWishAdded }) {
                 </label>
               ))}
             </div>
+
             {errors.attendance && <span className="field-error">{errors.attendance}</span>}
           </fieldset>
 
           <div className="form-grid-two">
             <div className="field-group">
               <label htmlFor="guestCount">Number of guests *</label>
+
               <input
                 id="guestCount"
                 name="guestCount"
@@ -330,6 +418,7 @@ function RSVPForm({ onWishAdded }) {
                 aria-describedby={errors.guestCount ? 'guestCount-error' : undefined}
                 required
               />
+
               {errors.guestCount && (
                 <span className="field-error" id="guestCount-error">
                   {errors.guestCount}
@@ -339,6 +428,7 @@ function RSVPForm({ onWishAdded }) {
 
             <div className="field-group">
               <label htmlFor="childName">Child name</label>
+
               <input
                 id="childName"
                 name="childName"
@@ -353,6 +443,7 @@ function RSVPForm({ onWishAdded }) {
 
           <div className="field-group">
             <label htmlFor="message">Message for Joaquim</label>
+
             <textarea
               id="message"
               name="message"
@@ -364,14 +455,17 @@ function RSVPForm({ onWishAdded }) {
               aria-invalid={Boolean(errors.message)}
               aria-describedby="message-helper"
             />
+
             <span className="helper-text" id="message-helper">
               {form.message.length}/220 characters
             </span>
+
             {errors.message && <span className="field-error">{errors.message}</span>}
           </div>
 
           <div className="field-group">
             <label htmlFor="dietaryNotes">Dietary notes or allergies</label>
+
             <textarea
               id="dietaryNotes"
               name="dietaryNotes"
@@ -423,12 +517,15 @@ function GuestWall({ wishes, onReaction }) {
               <span className="avatar" aria-hidden="true">
                 💙
               </span>
+
               <div>
                 <h3>{wish.guestName || 'Birthday Guest'}</h3>
                 <time dateTime={wish.createdAt}>Birthday wish</time>
               </div>
             </div>
+
             <p>{wish.message}</p>
+
             <div className="reaction-row" aria-label={`React to ${wish.guestName}'s message`}>
               {REACTIONS.map((reaction) => (
                 <button
@@ -453,6 +550,7 @@ function Footer() {
   return (
     <footer className="footer">
       <p>Made with love for Joaquim&apos;s 4th birthday 💙</p>
+
       <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">
         Questions? Contact Sarah on WhatsApp
       </a>
@@ -475,6 +573,7 @@ export default function App() {
       try {
         const response = await fetch(`${SCRIPT_URL}?action=messages&limit=12`);
         const data = await response.json();
+
         if (data.ok && Array.isArray(data.messages) && data.messages.length) {
           const remoteWishes = data.messages.map((item, index) => ({
             id: `remote-${item.timestamp || index}-${index}`,
@@ -483,6 +582,7 @@ export default function App() {
             reactionCounts: item.reactionCounts || {},
             createdAt: item.timestamp || new Date().toISOString(),
           }));
+
           setWishes((current) => [...remoteWishes, ...current]);
         }
       } catch {
@@ -501,7 +601,9 @@ export default function App() {
     setWishes((current) =>
       current.map((item) => {
         if (item.id !== wishId) return item;
+
         const currentCount = item.reactionCounts?.[reaction] || 0;
+
         return {
           ...item,
           reactionCounts: {
@@ -535,14 +637,21 @@ export default function App() {
     <main className="app-shell">
       <div className="background-photo" aria-hidden="true" />
       <div className="page-overlay" aria-hidden="true" />
+
       <FloatingDecorations />
       <MusicControl />
 
       <div className="content-shell">
+        <TopNav />
+
         <Hero />
+
         <RSVPForm onWishAdded={addWish} />
+
         {wallNotice && <div className="wall-toast">{wallNotice}</div>}
+
         <GuestWall wishes={sortedWishes} onReaction={addReaction} />
+
         <Footer />
       </div>
     </main>
