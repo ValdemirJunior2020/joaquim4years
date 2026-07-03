@@ -32,7 +32,7 @@ const REACTIONS = ['🎂', '🎈', '💙', '🥳', '⭐'];
 
 function createLocalWish(form) {
   return {
-    id: `local-${Date.now()}`,
+    id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     guestName: form.guestName.trim(),
     message:
       form.message.trim() ||
@@ -42,6 +42,14 @@ function createLocalWish(form) {
     reactionCounts: {},
     createdAt: new Date().toISOString(),
   };
+}
+
+function createSafeId(value) {
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 140);
 }
 
 async function sendToGoogleSheets(payload) {
@@ -133,6 +141,7 @@ function MusicControl() {
     try {
       audio.volume = 0.28;
       audio.loop = true;
+
       await audio.play();
 
       setIsPlaying(true);
@@ -238,7 +247,7 @@ function Hero() {
         <h1>Joaquim is turning 4!</h1>
 
         <p className="hero-copy">
-          Join us for a sweet pastel-blue celebration filled with smiles, music, birthday wishes,
+          Join us for a sweet celebration filled with smiles, music, birthday wishes,
           and a little magic for Joaquim&apos;s special day.
         </p>
 
@@ -512,7 +521,10 @@ function GuestWall({ wishes, onReaction }) {
 
       <div className="wish-grid">
         {wishes.map((wish) => (
-          <article className="wish-card" key={wish.id}>
+          <article
+            className="wish-card"
+            key={`${wish.id}-${wish.guestName || 'guest'}-${wish.createdAt || 'time'}`}
+          >
             <div className="wish-header">
               <span className="avatar" aria-hidden="true">
                 💙
@@ -575,15 +587,43 @@ export default function App() {
         const data = await response.json();
 
         if (data.ok && Array.isArray(data.messages) && data.messages.length) {
-          const remoteWishes = data.messages.map((item, index) => ({
-            id: `remote-${item.timestamp || index}-${index}`,
-            guestName: item.guestName || 'Birthday Guest',
-            message: item.message || 'Sent birthday love to Joaquim! 💙',
-            reactionCounts: item.reactionCounts || {},
-            createdAt: item.timestamp || new Date().toISOString(),
-          }));
+          const remoteWishes = data.messages.map((item, index) => {
+            const guestName = item.guestName || 'Birthday Guest';
+            const message = item.message || 'Sent birthday love to Joaquim! 💙';
+            const timestamp = item.timestamp || new Date().toISOString();
 
-          setWishes((current) => [...remoteWishes, ...current]);
+            return {
+              id: createSafeId(`remote-${timestamp}-${guestName}-${message}-${index}`),
+              guestName,
+              message,
+              reactionCounts: item.reactionCounts || {},
+              createdAt: timestamp,
+            };
+          });
+
+          setWishes((current) => {
+            const existingKeys = new Set(
+              current.map(
+                (wish) =>
+                  `${wish.guestName || ''}::${wish.message || ''}::${wish.createdAt || ''}`,
+              ),
+            );
+
+            const newUniqueWishes = remoteWishes.filter((wish) => {
+              const key = `${wish.guestName || ''}::${wish.message || ''}::${
+                wish.createdAt || ''
+              }`;
+
+              if (existingKeys.has(key)) {
+                return false;
+              }
+
+              existingKeys.add(key);
+              return true;
+            });
+
+            return [...newUniqueWishes, ...current];
+          });
         }
       } catch {
         // Recent wall messages are optional. The RSVP form still works without this request.
@@ -594,7 +634,18 @@ export default function App() {
   }, []);
 
   const addWish = (wish) => {
-    setWishes((current) => [wish, ...current]);
+    setWishes((current) => {
+      const alreadyExists = current.some(
+        (item) =>
+          item.guestName === wish.guestName &&
+          item.message === wish.message &&
+          item.createdAt === wish.createdAt,
+      );
+
+      if (alreadyExists) return current;
+
+      return [wish, ...current];
+    });
   };
 
   const addReaction = async (wishId, reaction, wish) => {
