@@ -161,13 +161,13 @@ p {
 }
 
 h1 {
-  max-width: 780px;
-  margin: 0;
-  color: #123c5b;
-  font-size: clamp(3rem, 17vw, 7.6rem);
-  line-height: 0.88;
-  letter-spacing: -0.08em;
-  text-wrap: balance;
+ @media (max-width: 640px) {
+  h1 {
+    font-size: clamp(2.4rem, 12vw, 3.8rem);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+  }
+}
 }
 
 .hero-copy {
