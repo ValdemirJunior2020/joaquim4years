@@ -5,6 +5,10 @@ const WHATSAPP_URL =
   'https://wa.me/19548606616?text=Hi%20Sarah%2C%20I%20have%20a%20question%20about%20Joaquim%27s%204th%20birthday%20party';
 
 const PARTY_ADDRESS = '1915 N A St, Lake Worth Beach, FL 33460';
+const PARTY_DATE = 'Saturday, August 1';
+const PARTY_TIME = '10:00 AM';
+const PARTY_ROOM = 'Blue Room';
+
 const PARTY_MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
   PARTY_ADDRESS,
 )}`;
@@ -90,9 +94,9 @@ function TopNav() {
     <nav className="top-nav" aria-label="Birthday party details">
       <div className="top-nav-main">
         <span className="top-nav-pill">🎉 Joaquim&apos;s 4th Birthday</span>
-        <span>📅 July 30</span>
-        <span>🏠 Blue Room</span>
-        <span>⏰ Time TBC</span>
+        <span>📅 {PARTY_DATE}</span>
+        <span>⏰ {PARTY_TIME}</span>
+        <span>🏠 {PARTY_ROOM}</span>
       </div>
 
       <a
